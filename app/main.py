@@ -9,12 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers.auth import router as auth_router
 from app.routers import addresses
 from app.routers.orders import router as orders_router
-
+from app.config import settings
 app = FastAPI(title="DealGuru API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+         "https://dealgurufrontend.vercel.app",
         "http://localhost:8080",
         "http://127.0.0.1:8080",
     ],
