@@ -1,0 +1,58 @@
+[
+  {
+    "id": "dg1",
+    "name": "USB Rechargeable Electric Arc Lighter",
+    "category": "home-kitchen",
+    "image": "/__l5e/assets-v1/4af8f848-4206-4ff2-bca6-bfde5ba71bd8/lighter-all.jpg",
+    "images": [
+      "/__l5e/assets-v1/4af8f848-4206-4ff2-bca6-bfde5ba71bd8/lighter-all.jpg",
+      "/__l5e/assets-v1/acb35980-99e2-4e8e-8d50-a99225c0e081/lighter-blue.jpg",
+      "/__l5e/assets-v1/4b9d811c-3b72-4782-b46e-5203ec63f92e/lighter-pink.jpg",
+      "/__l5e/assets-v1/8540e328-6762-489e-b26c-f566649dc96c/lighter-red.jpg",
+      "/__l5e/assets-v1/a50e4a62-678d-4bbb-9edd-5093ae976b5c/lighter-silver.jpg",
+      "/__l5e/assets-v1/13f573ca-73fe-4026-a130-c48401ca9974/lighter-black.jpg",
+      "/__l5e/assets-v1/92ad9dca-017a-4067-8016-05edb5ff64d4/lighter-gold.jpg"
+    ],
+    "colors": [
+      "blue",
+      "pink",
+      "red",
+      "silver",
+      "black",
+      "gold"
+    ],
+    "colorImages": {
+      "blue": "/__l5e/assets-v1/acb35980-99e2-4e8e-8d50-a99225c0e081/lighter-blue.jpg",
+      "pink": "/__l5e/assets-v1/4b9d811c-3b72-4782-b46e-5203ec63f92e/lighter-pink.jpg",
+      "red": "/__l5e/assets-v1/8540e328-6762-489e-b26c-f566649dc96c/lighter-red.jpg",
+      "silver": "/__l5e/assets-v1/a50e4a62-678d-4bbb-9edd-5093ae976b5c/lighter-silver.jpg",
+      "black": "/__l5e/assets-v1/13f573ca-73fe-4026-a130-c48401ca9974/lighter-black.jpg",
+      "gold": "/__l5e/assets-v1/92ad9dca-017a-4067-8016-05edb5ff64d4/lighter-gold.jpg"
+    },
+    "price": 299,
+    "originalPrice": 299,
+    "rating": 0,
+    "reviewCount": 0,
+    "badge": "New",
+    "isNew": true,
+    "createdAt": "2026-10-27",
+    "fabric": "Other",
+    "occasion": "Casual",
+    "description": "A flameless electric arc lighter with a long, flexible neck. No gas, no refills — just charge it with the included USB Type-C cable and press to light. Perfect for candles, diyas, gas stoves, agarbatti, BBQs and camping.",
+    "setIncludes": "1 Electric Arc Lighter + USB Type-C charging cable",
+    "features": [
+      "Rechargeable via USB Type-C — no gas or refills",
+      "Flameless, windproof electric arc",
+      "Flexible 360° neck reaches deep candle jars",
+      "Safety switch to prevent accidental lighting",
+      "Available in 6 colours"
+    ],
+    "stock": 50,
+    "sku": "DG-HK-001",
+    "sizes": [],
+    "status": "active",
+    "showInPopular": true,
+    "showInBestSellers": true,
+    "featuredAt": "2026-10-27T00:00:00Z"
+  }
+]
