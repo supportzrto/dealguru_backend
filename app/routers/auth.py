@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
@@ -27,9 +26,7 @@ def login(
     credentials: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    user = db.scalar(
-        select(User).where(User.email == credentials.username.lower())
-    )
+    user = db.scalar(select(User).where(User.email == credentials.username.lower()))
 
     if (
         user is None
@@ -47,9 +44,9 @@ def login(
         key=settings.cookie_name,
         value=token,
         httponly=True,
-        secure=False,  # Local development only
-        samesite="lax",
-        max_age=60 * 60,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+        max_age=settings.access_token_expire_minutes * 60,
         path="/",
     )
 
@@ -78,9 +75,7 @@ def register(
     email = str(data.email).strip().lower()
 
     # Check whether the email already exists
-    existing_user = db.scalar(
-        select(User).where(User.email == email)
-    )
+    existing_user = db.scalar(select(User).where(User.email == email))
 
     if existing_user:
         raise HTTPException(
@@ -122,15 +117,14 @@ def register(
     )
 
 
-
 @router.post("/logout")
 def logout(response: Response):
     response.delete_cookie(
         key=settings.cookie_name,
         path="/",
         httponly=True,
-        secure=False,
-        samesite="lax",
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
     )
 
     return {"message": "Logged out successfully"}
@@ -196,9 +190,7 @@ def get_customers(
     db: Session = Depends(get_db),
 ):
     customers = db.scalars(
-        select(User)
-        .where(User.role == "customer")
-        .order_by(User.created_at.desc())
+        select(User).where(User.role == "customer").order_by(User.created_at.desc())
     ).all()
 
     return [
@@ -212,5 +204,3 @@ def get_customers(
         }
         for user in customers
     ]
-
-
