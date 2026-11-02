@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -10,7 +9,8 @@ from app.routers.auth import router as auth_router
 from app.routers import addresses
 from app.routers.orders import router as orders_router
 from app.config import settings
-app = FastAPI(title="DealGuru API", version="0.1.0")
+# redirect_slashes=False: a 307 slash-redirect on a cross-site request drops the auth cookie
+app = FastAPI(title="DealGuru API", version="0.1.0", redirect_slashes=False)
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,3 +50,5 @@ def database_health():
             status_code=503,
             detail="Database connection failed",
         ) from exc
+
+    

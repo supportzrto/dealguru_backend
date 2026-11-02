@@ -1,4 +1,3 @@
-
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -19,6 +18,7 @@ router = APIRouter(
 )
 
 
+@router.get("", response_model=list[AddressResponse], include_in_schema=False)
 @router.get("/", response_model=list[AddressResponse])
 def get_addresses(
     current_user: User = Depends(get_current_user),
@@ -31,6 +31,7 @@ def get_addresses(
     ).all()
 
 
+@router.post("", response_model=AddressResponse, status_code=201, include_in_schema=False)
 @router.post("/", response_model=AddressResponse, status_code=201)
 def create_address(
     data: AddressCreate,
