@@ -1,4 +1,3 @@
-
 import uuid
 
 from datetime import datetime
@@ -60,6 +59,19 @@ class Payment(Base):
         default="created",
         index=True,
         nullable=False,
+    )
+
+    refund_status: Mapped[str] = mapped_column(
+        String(30),
+        default="not_required",
+        index=True,
+        nullable=False,
+    )
+
+    refund_reference: Mapped[str | None] = mapped_column(
+        String(100),
+        unique=True,
+        nullable=True,
     )
 
     method: Mapped[str | None] = mapped_column(String(40))

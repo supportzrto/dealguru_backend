@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.dependencies import get_db, get_current_user, get_current_admin
@@ -15,6 +15,11 @@ from app.models.user import User, Address
 from app.schemas.order import OrderCreate, OrderResponse
 from app.config import settings
 from app.models.payment import Payment
+from app.schemas.refund import (
+    RefundReviewItem,
+    RefundReferenceUpdate,
+    RefundReviewResponse,
+)
 
 
 router = APIRouter(prefix="/api/orders", tags=["Orders"])
@@ -710,3 +715,273 @@ def update_order_details(
     except Exception:
         db.rollback()
         raise
+
+@router.get(
+    "/admin/refunds/review",
+    response_model=list[RefundReviewItem],
+)
+def get_admin_refund_reviews(
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin),
+):
+    rows = db.execute(
+        select(Payment, Order, User)
+        .join(Order, Payment.order_id == Order.id)
+        .join(User, Order.user_id == User.id)
+        .where(
+            Payment.refund_status.in_(
+                ["review_required", "refund_initiated"]
+            )
+        )
+        .order_by(Payment.created_at.desc())
+    ).all()
+
+    return [
+        {
+            "payment_id": payment.id,
+            "order_id": order.id,
+            "customer_name": user.full_name,
+            "customer_email": user.email,
+            "provider_payment_id": payment.provider_payment_id,
+            "amount": payment.amount,
+            "currency": payment.currency,
+            "payment_status": payment.status,
+            "order_status": order.order_status,
+            "refund_status": payment.refund_status,
+            "refund_reference": payment.refund_reference,
+            "created_at": payment.created_at,
+        }
+        for payment, order, user in rows
+    ]
+def fetch_and_validate_razorpay_refund(
+    refund_reference: str,
+    payment: Payment,
+) -> dict:
+    try:
+        refund_data = razorpay_client.refund.fetch(refund_reference)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to verify this refund ID with Razorpay.",
+        )
+
+    if refund_data.get("payment_id") != payment.provider_payment_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This refund ID does not belong to the selected payment.",
+        )
+
+    expected_amount = int(
+        (payment.amount * Decimal("100")).quantize(
+            Decimal("1"),
+            rounding=ROUND_HALF_UP,
+        )
+    )
+
+    if refund_data.get("amount") != expected_amount:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Refund amount does not match the full payment amount.",
+        )
+
+    if refund_data.get("currency") != payment.currency:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Refund currency does not match the payment currency.",
+        )
+
+    if refund_data.get("status") not in {
+        "pending",
+        "processed",
+        "failed",
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Razorpay returned an unsupported refund status.",
+        )
+
+    return refund_data
+
+@router.patch(
+    "/admin/refunds/{payment_id}/record",
+    response_model=RefundReviewResponse,
+)
+def record_admin_refund(
+    payment_id: UUID,
+    payload: RefundReferenceUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin),
+):
+    # Find payment first, without locking.
+    initial_payment = db.scalar(
+        select(Payment).where(Payment.id == payment_id)
+    )
+
+    if not initial_payment:
+        raise HTTPException(
+            status_code=404,
+            detail="Payment not found.",
+        )
+
+    # Lock Order first to maintain consistent lock ordering.
+    order = db.scalar(
+        select(Order)
+        .where(Order.id == initial_payment.order_id)
+        .with_for_update()
+    )
+
+    if not order:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found.",
+        )
+
+    # Then lock Payment.
+    payment = db.scalar(
+        select(Payment)
+        .where(Payment.id == payment_id)
+        .with_for_update()
+    )
+
+    if not payment or payment.order_id != order.id:
+        raise HTTPException(
+            status_code=404,
+            detail="Payment not found.",
+        )
+
+    if payment.provider != "razorpay":
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported payment provider.",
+        )
+
+    if payment.status != "paid" or not payment.provider_payment_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Only captured payments can be refunded.",
+        )
+
+    if payment.refund_status not in {
+        "review_required",
+        "refund_initiated",
+    }:
+        raise HTTPException(
+            status_code=409,
+            detail="This payment is not awaiting refund review.",
+        )
+
+    if (
+        payment.refund_reference
+        and payment.refund_reference != payload.refund_reference
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="A different refund ID is already recorded.",
+        )
+
+    refund_data = fetch_and_validate_razorpay_refund(
+        payload.refund_reference,
+        payment,
+    )
+
+    razorpay_status = refund_data["status"]
+
+    payment.refund_reference = payload.refund_reference
+
+    if razorpay_status == "pending":
+        payment.refund_status = "refund_initiated"
+    elif razorpay_status == "processed":
+        payment.refund_status = "refunded"
+    else:
+        payment.refund_status = "review_required"
+
+    db.commit()
+    db.refresh(payment)
+
+    return {
+        "payment_id": payment.id,
+        "refund_reference": payment.refund_reference,
+        "refund_status": payment.refund_status,
+        "razorpay_status": razorpay_status,
+    }
+
+@router.patch(
+    "/admin/refunds/{payment_id}/sync",
+    response_model=RefundReviewResponse,
+)
+def sync_admin_refund(
+    payment_id: UUID,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin),
+):
+    initial_payment = db.scalar(
+        select(Payment).where(Payment.id == payment_id)
+    )
+
+    if not initial_payment:
+        raise HTTPException(
+            status_code=404,
+            detail="Payment not found.",
+        )
+
+    order = db.scalar(
+        select(Order)
+        .where(Order.id == initial_payment.order_id)
+        .with_for_update()
+    )
+
+    if not order:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found.",
+        )
+
+    payment = db.scalar(
+        select(Payment)
+        .where(Payment.id == payment_id)
+        .with_for_update()
+    )
+
+    if not payment or payment.order_id != order.id:
+        raise HTTPException(
+            status_code=404,
+            detail="Payment not found.",
+        )
+
+    if not payment.refund_reference:
+        raise HTTPException(
+            status_code=400,
+            detail="No refund ID has been recorded for this payment.",
+        )
+
+    if payment.refund_status not in {
+        "refund_initiated",
+        "review_required",
+    }:
+        raise HTTPException(
+            status_code=409,
+            detail="This refund does not need synchronization.",
+        )
+
+    refund_data = fetch_and_validate_razorpay_refund(
+        payment.refund_reference,
+        payment,
+    )
+
+    razorpay_status = refund_data["status"]
+
+    if razorpay_status == "pending":
+        payment.refund_status = "refund_initiated"
+    elif razorpay_status == "processed":
+        payment.refund_status = "refunded"
+    else:
+        payment.refund_status = "review_required"
+
+    db.commit()
+
+    return {
+        "payment_id": payment.id,
+        "refund_reference": payment.refund_reference,
+        "refund_status": payment.refund_status,
+        "razorpay_status": razorpay_status,
+    }

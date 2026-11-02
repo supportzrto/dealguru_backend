@@ -103,17 +103,15 @@ async def razorpay_webhook(
                 status_code=400,
                 detail="Missing payment details",
             )
-
-        payment = db.scalar(
-            select(Payment)
-            .where(
+# First find the payment without acquiring a row lock.
+        initial_payment = db.scalar(
+                select(Payment).where(
                 Payment.provider == "razorpay",
                 Payment.provider_order_id == razorpay_order_id,
             )
-            .with_for_update()
         )
 
-        if not payment:
+        if not initial_payment:
             db.execute(
                 WebhookEvent.__table__.update()
                 .where(WebhookEvent.id == inserted_event)
@@ -122,14 +120,33 @@ async def razorpay_webhook(
             db.commit()
             return {"status": "ignored"}
 
+# Always lock Order first, matching the payment verification route.
         order = db.scalar(
             select(Order)
-            .where(Order.id == payment.order_id)
+            .where(Order.id == initial_payment.order_id)
             .with_for_update()
         )
 
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+
+# Then lock Payment.
+        payment = db.scalar(
+            select(Payment)
+            .where(
+                Payment.id == initial_payment.id,
+                Payment.provider == "razorpay",
+                Payment.provider_order_id == razorpay_order_id,
+            )
+            .with_for_update()
+        )
+
+        if not payment or payment.order_id != order.id:
+            raise HTTPException(
+            status_code=409,
+            detail="Payment record changed during processing",
+        )
+
 
         expected_amount = int(
             (payment.amount * 100).quantize(
@@ -163,8 +180,11 @@ async def razorpay_webhook(
                 order.payment_status != "pending"
                 or order.order_status != "Pending Payment"
             ):
-                # Captured payment for a cancelled or changed order.
-                # Keep it visible for manual reconciliation/refund.
+                payment.provider_payment_id = razorpay_payment_id
+                payment.status = "paid"
+                payment.method = payment_entity.get("method")
+                payment.refund_status = "review_required"
+
                 event_status = "manual_review_required"
 
             else:
