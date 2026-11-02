@@ -109,6 +109,7 @@ def restore_stock(db: Session, order: Order) -> None:
                 product.stock += item.quantity
 
 
+@router.post("", response_model=OrderResponse, status_code=201, include_in_schema=False)
 @router.post("/", response_model=OrderResponse, status_code=201)
 def create_order(
     payload: OrderCreate,
@@ -284,6 +285,7 @@ def create_order(
         raise
 
 
+@router.get("", response_model=list[OrderResponse], include_in_schema=False)
 @router.get("/", response_model=list[OrderResponse])
 def get_my_orders(
     db: Session = Depends(get_db),
@@ -708,4 +710,3 @@ def update_order_details(
     except Exception:
         db.rollback()
         raise
-

@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -24,6 +23,7 @@ def get_db():
         db.close()
 
 
+@router.get("", response_model=list[ProductResponse], include_in_schema=False)
 @router.get("/", response_model=list[ProductResponse])
 def get_products(db: Session = Depends(get_db)):
     statement = (
@@ -52,6 +52,7 @@ def get_product(product_id: str, db: Session = Depends(get_db)):
 
     return product
 
+@router.post("", response_model=ProductResponse, status_code=201, include_in_schema=False)
 @router.post("/", response_model=ProductResponse, status_code=201)
 def create_product(
     product_data: ProductCreate,
@@ -184,5 +185,3 @@ def delete_product(
         "message": "Product deleted successfully",
         "product_id": product_id,
     }
-
-
