@@ -17,7 +17,8 @@ class Settings(BaseSettings):
 
     razorpay_key_id: str
     razorpay_key_secret: str
-
+    razorpay_webhook_secret: str
+    
     cookie_name: str = "dealguru_access_token"
     cookie_secure: bool = False
     cookie_samesite: str = "lax"

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers.auth import router as auth_router
 from app.routers import addresses
 from app.routers.orders import router as orders_router
+from app.routers.webhooks import router as webhooks_router
 from app.config import settings
 # redirect_slashes=False: a 307 slash-redirect on a cross-site request drops the auth cookie
 app = FastAPI(title="DealGuru API", version="0.1.0", redirect_slashes=False)
@@ -28,6 +29,7 @@ app.include_router(products_router)
 app.include_router(auth_router)
 app.include_router(addresses.router)
 app.include_router(orders_router)
+app.include_router(webhooks_router)
 
 @app.get("/")
 def root():
