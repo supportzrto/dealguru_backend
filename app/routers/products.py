@@ -7,7 +7,8 @@ from app.database import SessionLocal
 from app.models import Product, User
 from app.schemas.product import ProductCreate, ProductUpdate,ProductResponse
 from app.core.dependencies import get_current_admin
-
+from fastapi import UploadFile, File
+from app.services.cloudinary_service import upload_product_image
 
 router = APIRouter(
     prefix="/api/products",
@@ -43,6 +44,38 @@ def get_all_products_admin(
 
     return db.scalars(statement).all()
 
+@router.post("/admin/{product_id}/images")
+def upload_product_image_endpoint(
+    product_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    
+
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only image files are allowed",
+        )
+
+    try:
+        url = upload_product_image(
+            file.file,
+            product_id,
+            file.filename or "product-image.jpg",
+        )
+
+        return {"url": url}
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Image upload failed",
+        ) from exc
+
+    finally:
+        file.file.close()
 
 @router.get("/{product_id}", response_model=ProductResponse)
 def get_product(product_id: str, db: Session = Depends(get_db)):
@@ -50,16 +83,6 @@ def get_product(product_id: str, db: Session = Depends(get_db)):
         Product.id == product_id,
         Product.status == "active",
     )
-
-    product = db.scalar(statement)
-
-    if product is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Product not found",
-        )
-
-    return product
 
 @router.post("", response_model=ProductResponse, status_code=201, include_in_schema=False)
 @router.post("/", response_model=ProductResponse, status_code=201)
