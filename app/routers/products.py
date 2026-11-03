@@ -34,6 +34,15 @@ def get_products(db: Session = Depends(get_db)):
 
     return db.scalars(statement).all()
 
+@router.get("/admin/all", response_model=list[ProductResponse])
+def get_all_products_admin(
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    statement = select(Product).order_by(Product.created_at.desc())
+
+    return db.scalars(statement).all()
+
 
 @router.get("/{product_id}", response_model=ProductResponse)
 def get_product(product_id: str, db: Session = Depends(get_db)):
